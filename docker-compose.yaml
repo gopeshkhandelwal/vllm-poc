@@ -6,8 +6,6 @@ services:
     privileged: true # Translated from --privileged
     network_mode: "host" # Translated from --net=host
     shm_size: "64g" # Translated from --shm-size="64g"
-    stdin_open: true # Translated from -i
-    tty: true # Translated from -t
     devices:
       - /dev/dri:/dev/dri # Translated from --device=/dev/dri
     environment:
