@@ -1,25 +1,4 @@
-# Simple LangGraph workflow compose (Architect -> Reviewer)
-# Run from repo root:
-#   docker compose up --build
-
 services:
-  comfyui:
-    image: comfyanonymous/comfyui:latest
-    container_name: comfyui
-    ports:
-      - "8188:8188"
-    volumes:
-      - ./comfyui_workspace:/root/.comfyui
-    restart: unless-stopped
-    networks:
-      - lang_net
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -fsS http://localhost:8188/ || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
   orchestrator:
     build:
       context: ./orchestrator
@@ -27,14 +6,10 @@ services:
     container_name: langgraph_orchestrator
     ports:
       - "9000:9000"
-    depends_on:
-      comfyui:
-        condition: service_healthy
     environment:
       # Point orchestrator to the host-exposed vLLM. Adjust for Linux host if needed (use host IP or docker gateway).
       MODEL_NAME: "${MODEL_NAME}"
       VLLM_URL: "http://host.docker.internal:8000"
-      COMFYUI_URL: "http://comfyui:8188"
     restart: on-failure
     networks:
       - lang_net
@@ -42,4 +17,4 @@ services:
 networks:
   lang_net:
     driver: bridge
-
+~                  
