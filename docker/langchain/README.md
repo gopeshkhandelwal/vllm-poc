@@ -4,6 +4,11 @@ Start the langchain service:
 docker compose up -d --build
 ```
 
+Test the langchain:
+```bash
+curl -sS http://localhost:9000/selftest
+```
+
 Trigger the 2-node workflow (Architect → Reviewer)
 ```bash
 curl -sS -X POST http://localhost:9000/run \
@@ -11,19 +16,7 @@ curl -sS -X POST http://localhost:9000/run \
   -d '{"prompt":"Create a short architecture for a FAQ chatbot."}'
 ```
 
-Test the langchain:
-```bash
-curl -sS http://localhost:9000/selftest
-curl -sS -X POST http://localhost:9000/run -H 'Content-Type: application/json' -d '{"prompt":"Short FAQ chatbot architecture"}'
-
-curl -sS -X POST http://localhost:9000/langchain -H 'Content-Type: application/json' -d '{"input":"Say hi"}'
-```
-
-```bash
-curl -sS http://localhost:9000/selftest
-curl -sS -X POST http://localhost:9000/run -H 'Content-Type: application/json' -d '{"prompt":"Test prompt"}'
-```
-Result:
+Expected Result:
 ```bash
 curl -sS -X POST http://localhost:9000/run -H "Content-Type: application/json" -d '{"prompt":"Short FAQ chatbot architecture"}' | jq
 {
