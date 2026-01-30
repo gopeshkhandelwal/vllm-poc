@@ -2,6 +2,7 @@
 set -e
 
 # Define model paths
+WORKFLOW_DIR="/llm/ComfyUI/user/default/workflows"
 MODEL_DIR="/llm/ComfyUI/models"
 export http_proxy="http://proxy-dmz.intel.com:912"
 export https_proxy="http://proxy-dmz.intel.com:912"
@@ -33,20 +34,25 @@ download_if_missing() {
 
 echo "Verifying FLUX.2 models..."
 
-# FLUX.2 Dev FP8 Mixed
+# Workflow
 download_if_missing \
-    "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors" \
-    "$MODEL_DIR/diffusion_models/flux2_dev_fp8mixed.safetensors"
+    "https://raw.githubusercontent.com/intel/llm-scaler/refs/heads/main/omni/workflows/image_flux2_q40_gguf.json" \
+    "$WORKFLOW_DIR/image_flux2_q40_gguf.json"
+
+# FLUX.2 Dev Q4_0
+download_if_missing \
+    "https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q4_0.gguf" \
+    "$MODEL_DIR/diffusion_models/flux2_dev_q4_0.gguf"
 
 # Mistral Text Encoder
 download_if_missing \
-    "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors" \
-    "$MODEL_DIR/text_encoders/mistral_3_small_flux2_bf16.safetensors"
+    "https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors" \
+    "$MODEL_DIR/text_encoders/mistral_3_small_flux2_fp8.safetensors"
 
 # LoRA
 download_if_missing \
-    "https://huggingface.co/ostris/flux2_berthe_morisot/resolve/main/flux2_berthe_morisot.safetensors" \
-    "$MODEL_DIR/loras/flux2_berthe_morisot.safetensors"
+    "https://huggingface.co/ByteZSzn/Flux.2-Turbo-ComfyUI/resolve/main/Flux_2-Turbo-LoRA_comfyui.safetensors" \
+    "$MODEL_DIR/loras/Flux_2-Turbo-LoRA_comfyui.safetensors"
 
 # VAE
 download_if_missing \
