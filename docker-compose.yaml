@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     image: intel/llm-scaler-omni:0.1.0-b5
     container_name: comfyui_flux2_service
-    runtime: runc # Default docker runtime
+    # runtime: runc # Default docker runtime
     environment:
       - http_proxy=http://proxy-dmz.intel.com:912
       - https_proxy=http://proxy-dmz.intel.com:912

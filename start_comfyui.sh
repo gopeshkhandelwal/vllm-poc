@@ -20,7 +20,12 @@ download_if_missing() {
     
     if [ ! -f "$dest" ]; then
         echo "Downloading: $dest"
-        wget -q --show-progress "$url" -O "$dest"
+        if ! wget -q --show-progress "$url" -O "$dest"; then
+            echo "Error: Failed to download $url"
+            # Remove the destination file if wget failed to avoid keeping a corrupt partial file
+            rm -f "$dest" 
+            exit 1
+        fi
     else
         echo "Found: $dest"
     fi
