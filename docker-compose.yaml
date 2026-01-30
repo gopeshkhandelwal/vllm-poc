@@ -3,6 +3,13 @@ services:
     image: intel/llm-scaler-omni:0.1.0-b5
     container_name: comfyui_flux2_service
     # runtime: runc # Default docker runtime
+    privileged: true # Translated from --privileged
+    network_mode: "host" # Translated from --net=host
+    shm_size: "64g" # Translated from --shm-size="64g"
+    stdin_open: true # Translated from -i
+    tty: true # Translated from -t
+    devices:
+      - /dev/dri:/dev/dri # Translated from --device=/dev/dri
     environment:
       - http_proxy=http://proxy-dmz.intel.com:912
       - https_proxy=http://proxy-dmz.intel.com:912
@@ -11,11 +18,8 @@ services:
     volumes:
       # Persistent model storage as requested
       - ./models/comfyui:/llm/ComfyUI/models
-      # Mount the startup script to override default entrypoint logic
       - ./start_comfyui.sh:/llm/ComfyUI/start_comfyui.sh
-    ports:
-      - "3000:3000"
-    # Execute the checking script instead of the default command
+    # Ports are ignored when using network_mode: host
     command: ["/bin/bash", "/llm/ComfyUI/start_comfyui.sh"]
     healthcheck:
       # Verify API is responding (wget is installed in the base image)
