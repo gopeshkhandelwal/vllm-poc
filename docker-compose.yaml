@@ -9,6 +9,7 @@ services:
     devices:
       - /dev/dri:/dev/dri # Translated from --device=/dev/dri
     environment:
+      - PYTHONUNBUFFERED=1
       - http_proxy=http://proxy-dmz.intel.com:912
       - https_proxy=http://proxy-dmz.intel.com:912
       - no_proxy=localhost,127.0.0.1

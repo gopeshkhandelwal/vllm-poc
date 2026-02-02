@@ -21,7 +21,7 @@ download_if_missing() {
     
     if [ ! -f "$dest" ]; then
         echo "Downloading: $dest"
-        if ! wget -q --show-progress "$url" -O "$dest"; then
+        if ! wget -q "$url" -O "$dest"; then
             echo "Error: Failed to download $url"
             # Remove the destination file if wget failed to avoid keeping a corrupt partial file
             rm -f "$dest" 
@@ -42,7 +42,7 @@ download_if_missing \
 # FLUX.2 Dev Q4_0
 download_if_missing \
     "https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q4_0.gguf" \
-    "$MODEL_DIR/diffusion_models/flux2_dev_q4_0.gguf"
+    "$MODEL_DIR/diffusion_models/flux2-dev-Q4_0.gguf"
 
 # Mistral Text Encoder
 download_if_missing \
