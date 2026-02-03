@@ -17,4 +17,3 @@ services:
 networks:
   lang_net:
     driver: bridge
-~                  
