@@ -1,4 +1,50 @@
 services:
+  # =============================================================
+  # vLLM Text-Only Chat Model (GPU0)
+  # OpenAI-compatible API at http://localhost:8000/v1
+  # =============================================================
+  vllm-architect:
+    image: intel/llm-scaler-vllm:0.11.1-b7
+    container_name: vllm_architect
+    privileged: true
+    network_mode: host
+    shm_size: 32g
+    ipc: host
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
+      - HF_HOME=/tmp/hf_cache
+      - HF_HUB_CACHE=/tmp/hf_cache
+      - TRANSFORMERS_CACHE=/tmp/hf_cache
+      - SYCL_CACHE_PERSISTENT=1
+      - SYCL_CACHE_DIR=/llm/models/.sycl_cache
+      # Force V0 engine to avoid Mamba2 attention bugs on XPU
+      - VLLM_USE_V1=0
+      - http_proxy=http://proxy-dmz.intel.com:912
+      - https_proxy=http://proxy-dmz.intel.com:912
+      - HTTP_PROXY=http://proxy-dmz.intel.com:912
+      - HTTPS_PROXY=http://proxy-dmz.intel.com:912
+      - no_proxy=localhost,127.0.0.1
+      - NO_PROXY=localhost,127.0.0.1
+      # Pin to GPU0
+      - ONEAPI_DEVICE_SELECTOR=level_zero:0
+      - ZE_AFFINITY_MASK=0
+    volumes:
+      # Persistent model storage for HuggingFace models
+      - ./models/huggingface:/llm/models
+      - ./start-vllm-architect.sh:/llm/start-vllm-architect.sh
+    entrypoint: [""]
+    command: ["/bin/bash", "/llm/start-vllm-architect.sh"]
+    healthcheck:
+      # Health check to confirm vLLM API is responding on the OpenAI-compatible endpoint
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/v1/models >/dev/null || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 20
+      start_period: 900s
+    restart: unless-stopped
+
   orchestrator:
     build:
       context: ./langgraph/orchestrator
