@@ -4,11 +4,11 @@ AI-powered design studio with LLM inference and image generation on Intel XPU.
 
 ## Services
 
-### vLLM Architect (Port 8000)
+### vLLM Architect (Port 8001)
 OpenAI-compatible LLM API running on Intel XPU.
 
-- **Model**: `Qwen/Qwen3-8B`
-- **Endpoint**: `http://localhost:8000/v1`
+- **Model**: `Qwen/Qwen2.5-7B-Instruct`
+- **Endpoint**: `http://localhost:8001/v1`
 - **GPU**: GPU0 (Intel XPU via Level Zero)
 
 ### ComfyUI Flux (Port 3000)
@@ -24,7 +24,12 @@ LangGraph-based orchestrator connecting LLM and image services.
 docker compose up -d
 
 # Check vLLM status
-curl http://localhost:8000/v1/models
+curl http://localhost:8001/v1/models
+
+# Test chat completion
+curl http://localhost:8001/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "Qwen/Qwen2.5-7B-Instruct", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 50}'
 
 # Check ComfyUI status
 curl http://localhost:3000/
@@ -35,7 +40,7 @@ curl http://localhost:3000/
 ### vLLM Settings
 | Setting | Value |
 |---------|-------|
-| Model | `Qwen/Qwen3-8B` |
+| Model | `Qwen/Qwen2.5-7B-Instruct` |
 | Context Length | 1024 tokens |
 | Precision | BF16 |
 | GPU Selection | `ONEAPI_DEVICE_SELECTOR=level_zero:0` |

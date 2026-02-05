@@ -6,9 +6,9 @@ set -euo pipefail
 # Downloads model if missing, then starts OpenAI-compatible API
 # =============================================================
 
-MODEL_ID="Qwen/Qwen3-8B"
-MODEL_LOCAL_PATH="/llm/models/Qwen/Qwen3-8B"
-SERVED_MODEL_NAME="Qwen/Qwen3-8B"
+MODEL_ID="Qwen/Qwen2.5-7B-Instruct"
+MODEL_LOCAL_PATH="/llm/models/Qwen/Qwen2.5-7B-Instruct"
+SERVED_MODEL_NAME="Qwen/Qwen2.5-7B-Instruct"
 
 # Proxy settings for model download
 export http_proxy="${http_proxy:-http://proxy-dmz.intel.com:912}"
@@ -41,12 +41,12 @@ if [ ! -f "$MODEL_LOCAL_PATH/config.json" ]; then
     exit 1
 fi
 
-echo "=== Starting vLLM OpenAI-compatible API server on port 8000 ==="
+echo "=== Starting vLLM OpenAI-compatible API server on port 8001 ==="
 exec python -m vllm.entrypoints.openai.api_server \
     --model "$MODEL_LOCAL_PATH" \
     --served-model-name "$SERVED_MODEL_NAME" \
     --host 0.0.0.0 \
-    --port 8000 \
+    --port 8001 \
     --tensor-parallel-size 1 \
     --max-model-len 1024 \
     --dtype bfloat16 \

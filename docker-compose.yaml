@@ -38,7 +38,7 @@ services:
     command: ["/bin/bash", "/llm/start-vllm-architect.sh"]
     healthcheck:
       # Health check to confirm vLLM API is responding on the OpenAI-compatible endpoint
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/v1/models >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/v1/models >/dev/null || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 20
