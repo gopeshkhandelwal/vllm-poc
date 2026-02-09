@@ -27,24 +27,9 @@ services:
       - NO_PROXY=localhost,127.0.0.1
     volumes:
       - ./models/huggingface:/llm/models
-    command:
-      - /llm/models/mistralai/Ministral-8B-Instruct-2410
-      - --served-model-name
-      - mistralai/Ministral-8B-Instruct-2410
-      - --host
-      - "0.0.0.0"
-      - --port
-      - "8001"
-      - --tensor-parallel-size
-      - "1"
-      - --max-model-len
-      - "4096"
-      - --dtype
-      - bfloat16
-      - --gpu-memory-utilization
-      - "0.9"
-      - --trust-remote-code
-      - --enforce-eager
+      - ./start-vllm-architect.sh:/llm/start-vllm-architect.sh
+    entrypoint: [""]
+    command: ["/bin/bash", "/llm/start-vllm-architect.sh"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8001/v1/models >/dev/null || exit 1"]
       interval: 30s
