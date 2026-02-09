@@ -1,10 +1,11 @@
 services:
   # =============================================================
-  # vLLM Text-Only Chat Model (GPU0)
-  # OpenAI-compatible API at http://localhost:8000/v1
+  # vLLM Architect - Text Generation Service
+  # Intel XPU vLLM for Arc Pro B60 GPUs
+  # OpenAI-compatible API at http://localhost:8001/v1
   # =============================================================
   vllm-architect:
-    image: intel/llm-scaler-vllm:0.11.1-b7
+    image: xpu-vllm-gil:latest
     container_name: vllm_architect
     privileged: true
     network_mode: host
@@ -14,37 +15,48 @@ services:
       - /dev/dri:/dev/dri
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
-      - HF_HOME=/tmp/hf_cache
-      - HF_HUB_CACHE=/tmp/hf_cache
-      - TRANSFORMERS_CACHE=/tmp/hf_cache
-      - SYCL_CACHE_PERSISTENT=1
-      - SYCL_CACHE_DIR=/llm/models/.sycl_cache
-      # Force V0 engine to avoid Mamba2 attention bugs on XPU
-      - VLLM_USE_V1=0
+      - HF_HOME=/llm/models/.hf_cache
+      - SYCL_CACHE_PERSISTENT=0
+      - TORCH_COMPILE_DISABLE=1
+      - VLLM_WORKER_MULTIPROC_METHOD=spawn
       - http_proxy=http://proxy-dmz.intel.com:912
       - https_proxy=http://proxy-dmz.intel.com:912
       - HTTP_PROXY=http://proxy-dmz.intel.com:912
       - HTTPS_PROXY=http://proxy-dmz.intel.com:912
       - no_proxy=localhost,127.0.0.1
       - NO_PROXY=localhost,127.0.0.1
-      # Pin to GPU0
-      - ONEAPI_DEVICE_SELECTOR=level_zero:0
-      - ZE_AFFINITY_MASK=0
     volumes:
-      # Persistent model storage for HuggingFace models
       - ./models/huggingface:/llm/models
-      - ./start-vllm-architect.sh:/llm/start-vllm-architect.sh
-    entrypoint: [""]
-    command: ["/bin/bash", "/llm/start-vllm-architect.sh"]
+    command:
+      - /llm/models/mistralai/Ministral-8B-Instruct-2410
+      - --served-model-name
+      - mistralai/Ministral-8B-Instruct-2410
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8001"
+      - --tensor-parallel-size
+      - "1"
+      - --max-model-len
+      - "4096"
+      - --dtype
+      - bfloat16
+      - --gpu-memory-utilization
+      - "0.9"
+      - --trust-remote-code
+      - --enforce-eager
     healthcheck:
-      # Health check to confirm vLLM API is responding on the OpenAI-compatible endpoint
       test: ["CMD-SHELL", "curl -fsS http://localhost:8001/v1/models >/dev/null || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 20
-      start_period: 900s
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 600s
     restart: unless-stopped
 
+  # =============================================================
+  # LangGraph Orchestrator
+  # Routes requests between LLM and image generation services
+  # =============================================================
   orchestrator:
     build:
       context: ./langgraph/orchestrator
@@ -53,22 +65,27 @@ services:
     ports:
       - "9000:9000"
     environment:
-      # Point orchestrator to the host-exposed vLLM. Adjust for Linux host if needed (use host IP or docker gateway).
       MODEL_NAME: "${MODEL_NAME}"
-      VLLM_URL: "http://host.docker.internal:8000"
+      VLLM_URL: "http://host.docker.internal:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: on-failure
     networks:
       - lang_net
 
+  # =============================================================
+  # ComfyUI with Flux2 Image Generation
+  # Intel-optimized image generation service
+  # Web UI at http://localhost:3000
+  # =============================================================
   comfyui-flux2:
     image: intel/llm-scaler-omni:0.1.0-b5
     container_name: comfyui_flux2_service
-    # runtime: runc # Default docker runtime
-    privileged: true # Translated from --privileged
-    network_mode: "host" # Translated from --net=host
-    shm_size: "64g" # Translated from --shm-size="64g"
+    privileged: true
+    network_mode: host
+    shm_size: 64g
     devices:
-      - /dev/dri:/dev/dri # Translated from --device=/dev/dri
+      - /dev/dri:/dev/dri
     environment:
       - PYTHONUNBUFFERED=1
       - http_proxy=http://proxy-dmz.intel.com:912
@@ -76,19 +93,11 @@ services:
       - no_proxy=localhost,127.0.0.1
       - COMFYUI_MODEL_DIR=/llm/ComfyUI/models
     volumes:
-      # Persistent model storage as requested
       - ./models/comfyui:/llm/ComfyUI/models
       - ./start_comfyui.sh:/llm/ComfyUI/start_comfyui.sh
-    # Ports are ignored when using network_mode: host
-    command: [ "/bin/bash", "/llm/ComfyUI/start_comfyui.sh" ]
+    command: ["/bin/bash", "/llm/ComfyUI/start_comfyui.sh"]
     healthcheck:
-      # Verify API is responding (wget is installed in the base image)
-      # The --spider flag is used here to check if the server is up without downloading any files.
-      # In the context of a health check:
-      #   * It behaves like a web crawler (spider): it sends a request to the URL (http://localhost:3000/) to verify connectivity.
-      #   * If the server responds (e.g., with a 200 OK), wget returns a success exit code (0).
-      #   * It discards the content instead of saving an index.html file to the container's disk every 30 seconds, which keeps the container clean.
-      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/" ]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 30s
       timeout: 10s
       retries: 5
