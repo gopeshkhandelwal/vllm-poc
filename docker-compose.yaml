@@ -5,7 +5,7 @@ services:
   # OpenAI-compatible API at http://localhost:8001/v1
   # =============================================================
   vllm-architect:
-    image: intel/vllm:0.11.1-xpu
+    image: xpu-vllm-gil:latest
     container_name: vllm_architect
     privileged: true
     network_mode: host
@@ -19,6 +19,7 @@ services:
       - SYCL_CACHE_PERSISTENT=0
       - TORCH_COMPILE_DISABLE=1
       - VLLM_WORKER_MULTIPROC_METHOD=spawn
+      - VLLM_LOGGING_LEVEL=INFO
       - http_proxy=http://proxy-dmz.intel.com:912
       - https_proxy=http://proxy-dmz.intel.com:912
       - HTTP_PROXY=http://proxy-dmz.intel.com:912
@@ -28,6 +29,7 @@ services:
     volumes:
       - ./models/huggingface:/llm/models
       - ./start-vllm-architect.sh:/llm/start-vllm-architect.sh
+      - ./logs:/llm/logs
     entrypoint: [""]
     command: ["/bin/bash", "/llm/start-vllm-architect.sh"]
     healthcheck:

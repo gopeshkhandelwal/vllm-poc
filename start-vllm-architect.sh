@@ -7,9 +7,9 @@ set -euo pipefail
 # OpenAI-compatible API at http://localhost:8001/v1
 # =============================================================
 
-MODEL_ID="mistralai/Ministral-8B-Instruct-2410"
-MODEL_LOCAL_PATH="/llm/models/mistralai/Ministral-8B-Instruct-2410"
-SERVED_MODEL_NAME="mistralai/Ministral-8B-Instruct-2410"
+MODEL_ID="openai/gpt-oss-20b"
+MODEL_LOCAL_PATH="/llm/models/openai/gpt-oss-20b"
+SERVED_MODEL_NAME="openai/gpt-oss-20b"
 
 echo "=== vLLM Architect Startup ==="
 echo "Model: $MODEL_ID"
@@ -35,13 +35,16 @@ fi
 
 echo "=== Starting vLLM server on port 8001 ==="
 
-exec vllm serve "$MODEL_LOCAL_PATH" \
+# Log metrics: Memory, CPU, KV-cache stats
+# MXFP4 quantized 20B model fits on 1 GPU (~10-12GB)
+vllm serve "$MODEL_LOCAL_PATH" \
     --served-model-name "$SERVED_MODEL_NAME" \
     --host 0.0.0.0 \
     --port 8001 \
     --tensor-parallel-size 1 \
     --max-model-len 4096 \
-    --dtype bfloat16 \
-    --gpu-memory-utilization 0.9 \
+    --gpu-memory-utilization 0.85 \
     --trust-remote-code \
-    --enforce-eager
+    --enforce-eager \
+    --enable-prefix-caching \
+    2>&1 | tee /llm/logs/vllm-metrics.log
