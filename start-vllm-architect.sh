@@ -35,16 +35,62 @@ fi
 
 echo "=== Starting vLLM server on port 8001 ==="
 
-# Log metrics: Memory, CPU, KV-cache stats
-# MXFP4 quantized 20B model fits on 1 GPU (~10-12GB)
+# vLLM serve configuration:
 vllm serve "$MODEL_LOCAL_PATH" \
     --served-model-name "$SERVED_MODEL_NAME" \
     --host 0.0.0.0 \
     --port 8001 \
-    --tensor-parallel-size 1 \
     --max-model-len 4096 \
-    --gpu-memory-utilization 0.85 \
     --trust-remote-code \
     --enforce-eager \
     --enable-prefix-caching \
-    2>&1 | tee /llm/logs/vllm-metrics.log
+    2>&1 | tee /llm/logs/vllm-metrics.log &
+
+VLLM_PID=$!
+
+# Warmup: wait for server and send test requests
+echo "=== Waiting for vLLM to be ready ==="
+for i in {1..60}; do
+    if curl -s http://localhost:8001/v1/models > /dev/null 2>&1; then
+        echo "vLLM is ready. Running warmup..."
+        break
+    fi
+    echo "Waiting for server... ($i/60)"
+    sleep 5
+done
+
+# Send warmup requests to trigger JIT compilation and graph capture
+echo "=== Running warmup requests ==="
+
+# Short prompt warmup (3 requests)
+for i in {1..3}; do
+    curl -s http://localhost:8001/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -d "{\"model\": \"$SERVED_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}], \"max_tokens\": 16}" \
+        > /dev/null 2>&1
+    echo "Short prompt warmup $i/3"
+done
+
+# Medium prompt warmup (3 requests)
+MEDIUM_PROMPT="You are a helpful assistant. Please explain the concept of machine learning in simple terms."
+for i in {1..3}; do
+    curl -s http://localhost:8001/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -d "{\"model\": \"$SERVED_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"$MEDIUM_PROMPT\"}], \"max_tokens\": 64}" \
+        > /dev/null 2>&1
+    echo "Medium prompt warmup $i/3"
+done
+
+# Longer output warmup (2 requests)
+for i in {1..2}; do
+    curl -s http://localhost:8001/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -d "{\"model\": \"$SERVED_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"Write a short paragraph about software architecture.\"}], \"max_tokens\": 128}" \
+        > /dev/null 2>&1
+    echo "Long output warmup $i/2"
+done
+
+echo "=== Warmup complete (8 requests). Server ready for production traffic ==="
+
+# Keep the server running in foreground
+wait $VLLM_PID

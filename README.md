@@ -7,9 +7,9 @@ AI-powered design studio with LLM inference and image generation on Intel XPU.
 ### vLLM Architect (Port 8001)
 OpenAI-compatible LLM API running on Intel XPU.
 
-- **Model**: `Qwen/Qwen2.5-7B-Instruct`
+- **Model**: `openai/gpt-oss-20b` (MXFP4 quantized)
 - **Endpoint**: `http://localhost:8001/v1`
-- **GPU**: GPU0 (Intel XPU via Level Zero)
+- **GPU**: Intel Arc Pro B60 (single GPU)
 
 ### ComfyUI Flux (Port 3000)
 Image generation service with ComfyUI backend.
@@ -29,7 +29,7 @@ curl http://localhost:8001/v1/models
 # Test chat completion
 curl http://localhost:8001/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model": "Qwen/Qwen2.5-7B-Instruct", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 50}'
+  -d '{"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 50}'
 
 # Check ComfyUI status
 curl http://localhost:3000/
@@ -40,10 +40,10 @@ curl http://localhost:3000/
 ### vLLM Settings
 | Setting | Value |
 |---------|-------|
-| Model | `Qwen/Qwen2.5-7B-Instruct` |
-| Context Length | 1024 tokens |
-| Precision | BF16 |
-| GPU Selection | `ONEAPI_DEVICE_SELECTOR=level_zero:0` |
+| Model | `openai/gpt-oss-20b` |
+| Context Length | 4096 tokens |
+| Precision | MXFP4 (quantized) |
+| GPU Memory | ~10-12GB |
 
 ### Model Storage
 - vLLM models: `./models/huggingface/`
@@ -62,4 +62,4 @@ Models are auto-downloaded on first startup.
 
 - Docker & Docker Compose
 - Intel XPU with Level Zero drivers
-- 24GB+ GPU memory per card
+- 16GB+ GPU memory

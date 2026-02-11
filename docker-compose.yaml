@@ -10,16 +10,16 @@ services:
     privileged: true
     network_mode: host
     shm_size: 32g
-    ipc: host
     devices:
       - /dev/dri:/dev/dri
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - HF_HOME=/llm/models/.hf_cache
-      - SYCL_CACHE_PERSISTENT=0
+      # Intel XPU: Disable torch.compile() - Triton backend incompatible with SYCL
       - TORCH_COMPILE_DISABLE=1
+      # Intel XPU: Required for multi-processing on XPU devices
       - VLLM_WORKER_MULTIPROC_METHOD=spawn
-      - VLLM_LOGGING_LEVEL=INFO
+      # Intel proxy configuration
       - http_proxy=http://proxy-dmz.intel.com:912
       - https_proxy=http://proxy-dmz.intel.com:912
       - HTTP_PROXY=http://proxy-dmz.intel.com:912
