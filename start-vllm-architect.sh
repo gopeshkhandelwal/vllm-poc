@@ -50,14 +50,30 @@ VLLM_PID=$!
 
 # Warmup: wait for server and send test requests
 echo "=== Waiting for vLLM to be ready ==="
+SERVER_READY=false
 for i in {1..60}; do
     if curl -s http://localhost:8001/v1/models > /dev/null 2>&1; then
         echo "vLLM is ready. Running warmup..."
+        SERVER_READY=true
         break
+    fi
+    # Check if vLLM process is still running
+    if ! kill -0 $VLLM_PID 2>/dev/null; then
+        echo "ERROR: vLLM process died unexpectedly"
+        echo "Check logs at /llm/logs/vllm-metrics.log"
+        exit 1
     fi
     echo "Waiting for server... ($i/60)"
     sleep 5
 done
+
+# Exit if server never became ready
+if [ "$SERVER_READY" = false ]; then
+    echo "ERROR: Server failed to start within timeout (5 minutes)"
+    kill $VLLM_PID 2>/dev/null || true
+    echo "Check logs at /llm/logs/vllm-metrics.log"
+    exit 1
+fi
 
 # Send warmup requests to trigger JIT compilation and graph capture
 echo "=== Running warmup requests ==="
