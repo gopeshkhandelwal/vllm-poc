@@ -40,9 +40,9 @@ vllm serve "$MODEL_LOCAL_PATH" \
     --served-model-name "$SERVED_MODEL_NAME" \
     --host 0.0.0.0 \
     --port 8001 \
-    --max-model-len 4096 \
+    --max-model-len 65536 \
+    --gpu-memory-utilization 0.9 \
     --trust-remote-code \
-    --enforce-eager \
     --enable-prefix-caching \
     2>&1 | tee /llm/logs/vllm-metrics.log &
 

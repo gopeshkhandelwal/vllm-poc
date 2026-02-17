@@ -41,9 +41,9 @@ curl http://localhost:3000/
 | Setting | Value |
 |---------|-------|
 | Model | `openai/gpt-oss-20b` |
-| Context Length | 4096 tokens |
+| Context Length | 65536 tokens |
 | Precision | MXFP4 (quantized) |
-| GPU Memory | ~10-12GB |
+| GPU Memory Utilization | 90% |
 
 ### Model Storage
 - vLLM models: `./models/huggingface/`

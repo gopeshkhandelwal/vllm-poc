@@ -9,12 +9,14 @@ services:
     container_name: vllm_architect
     privileged: true
     network_mode: host
-    shm_size: 32g
+    shm_size: 64g
     devices:
       - /dev/dri:/dev/dri
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - HF_HOME=/llm/models/.hf_cache
+      # Intel XPU: Select GPU 1 (avoids conflicts with other containers on GPU 0)
+      - ONEAPI_DEVICE_SELECTOR=level_zero:1
       # Intel XPU: Disable torch.compile() - Triton backend incompatible with SYCL
       - TORCH_COMPILE_DISABLE=1
       # Intel XPU: Required for multi-processing on XPU devices
