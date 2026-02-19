@@ -5,7 +5,7 @@ services:
   # OpenAI-compatible API at http://localhost:8001/v1
   # =============================================================
   vllm-architect:
-    image: xpu-vllm-gil:latest
+    image: amr-registry.caas.intel.com/intelcloud/xpu-vllm-gil:1.0
     container_name: vllm_architect
     privileged: true
     network_mode: host
