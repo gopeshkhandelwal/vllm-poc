@@ -7,20 +7,24 @@ set -euo pipefail
 # OpenAI-compatible API at http://localhost:8001/v1
 # =============================================================
 
-MODEL_ID="openai/gpt-oss-20b"
-MODEL_LOCAL_PATH="/llm/models/openai/gpt-oss-20b"
-SERVED_MODEL_NAME="openai/gpt-oss-20b"
+MODEL_ID="openai/gpt-oss-120b"
+MODEL_LOCAL_PATH="/llm/models/openai/gpt-oss-120b"
+SERVED_MODEL_NAME="openai/gpt-oss-120b"
 
 echo "=== vLLM Architect Startup ==="
 echo "Model: $MODEL_ID"
 echo "Path: $MODEL_LOCAL_PATH"
 
-# Download model if missing
-if [ ! -d "$MODEL_LOCAL_PATH" ] || [ -z "$(ls -A "$MODEL_LOCAL_PATH" 2>/dev/null)" ]; then
-    echo "=== Downloading model ==="
+# Download model if missing (exclude original/ and metal/ folders to save space)
+if [ ! -f "$MODEL_LOCAL_PATH/config.json" ]; then
+    echo "=== Downloading model (excluding original/ and metal/) ==="
     python -c "
 from huggingface_hub import snapshot_download
-snapshot_download(repo_id='$MODEL_ID', local_dir='$MODEL_LOCAL_PATH')
+snapshot_download(
+    repo_id='$MODEL_ID',
+    local_dir='$MODEL_LOCAL_PATH',
+    ignore_patterns=['original/*', 'metal/*']
+)
 "
     echo "Download complete."
 else
@@ -33,41 +37,80 @@ if [ ! -f "$MODEL_LOCAL_PATH/config.json" ]; then
     exit 1
 fi
 
+# Create chat template that instructs model to skip reasoning
+cat > /llm/chat_template.jinja << 'TEMPLATE'
+{%- if messages and messages[0]['role'] == 'system' -%}
+{{ messages[0]['content'] }}
+
+{%- set messages = messages[1:] -%}
+{%- endif %}
+
+{%- for message in messages %}
+{%- if message['role'] == 'user' %}
+User: {{ message['content'] }}
+
+{%- elif message['role'] == 'assistant' %}
+Assistant: {{ message['content'] }}
+
+{%- endif %}
+{%- endfor %}
+
+Assistant: IMPORTANT:
+- Return ONLY the final answer.
+- Do NOT include analysis, reasoning, or thinking steps.
+- Start immediately with the requested section headings or content.
+- Do not add preambles or summaries unless explicitly requested.
+- If the answer is long, provide a concise but complete response rather than reasoning.
+TEMPLATE
+
 echo "=== Starting vLLM server on port 8001 ==="
 
 # vLLM serve configuration:
+# --enforce-eager: Disable torch.compile to avoid RPC timeouts
+# --max-model-len 16384: Reduced context for faster KV cache allocation
 vllm serve "$MODEL_LOCAL_PATH" \
     --served-model-name "$SERVED_MODEL_NAME" \
     --host 0.0.0.0 \
     --port 8001 \
-    --max-model-len 65536 \
+    --tensor-parallel-size 4 \
+    --max-model-len 16384 \
     --gpu-memory-utilization 0.9 \
+    --quantization mxfp4 \
     --trust-remote-code \
     --enable-prefix-caching \
+    --enforce-eager \
+    --chat-template /llm/chat_template.jinja \
     2>&1 | tee /llm/logs/vllm-metrics.log &
 
 VLLM_PID=$!
 
-# Warmup: wait for server and send test requests
-echo "=== Waiting for vLLM to be ready ==="
+# Warmup: wait for server and send test requests (10 minutes timeout for large models)
+echo "=== Waiting for vLLM to be ready (showing live progress) ==="
 SERVER_READY=false
-for i in {1..60}; do
+LAST_LOG_LINES=0
+for i in {1..250}; do
     if curl -s http://localhost:8001/v1/models > /dev/null 2>&1; then
+        echo ""
+        echo "=========================================="
         echo "vLLM is ready. Running warmup..."
         SERVER_READY=true
         break
     fi
-    # Check if vLLM process is still running
     if ! kill -0 $VLLM_PID 2>/dev/null; then
         echo "ERROR: vLLM process died unexpectedly"
-        echo "Check logs at /llm/logs/vllm-metrics.log"
+        echo "=== Last 50 log lines ==="
+        tail -50 /llm/logs/vllm-metrics.log
         exit 1
     fi
-    echo "Waiting for server... ($i/60)"
+    # Show new log lines since last check
+    CURRENT_LINES=$(wc -l < /llm/logs/vllm-metrics.log 2>/dev/null || echo 0)
+    if [ "$CURRENT_LINES" -gt "$LAST_LOG_LINES" ]; then
+        tail -n +$((LAST_LOG_LINES + 1)) /llm/logs/vllm-metrics.log | head -50
+        LAST_LOG_LINES=$CURRENT_LINES
+    fi
     sleep 5
 done
 
-# Exit if server never became ready
 if [ "$SERVER_READY" = false ]; then
     echo "ERROR: Server failed to start within timeout (5 minutes)"
     kill $VLLM_PID 2>/dev/null || true
@@ -75,38 +118,14 @@ if [ "$SERVER_READY" = false ]; then
     exit 1
 fi
 
-# Send warmup requests to trigger JIT compilation and graph capture
 echo "=== Running warmup requests ==="
-
-# Short prompt warmup (3 requests)
 for i in {1..3}; do
     curl -s http://localhost:8001/v1/chat/completions \
         -H "Content-Type: application/json" \
         -d "{\"model\": \"$SERVED_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}], \"max_tokens\": 16}" \
         > /dev/null 2>&1
-    echo "Short prompt warmup $i/3"
+    echo "Warmup $i/3"
 done
 
-# Medium prompt warmup (3 requests)
-MEDIUM_PROMPT="You are a helpful assistant. Please explain the concept of machine learning in simple terms."
-for i in {1..3}; do
-    curl -s http://localhost:8001/v1/chat/completions \
-        -H "Content-Type: application/json" \
-        -d "{\"model\": \"$SERVED_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"$MEDIUM_PROMPT\"}], \"max_tokens\": 64}" \
-        > /dev/null 2>&1
-    echo "Medium prompt warmup $i/3"
-done
-
-# Longer output warmup (2 requests)
-for i in {1..2}; do
-    curl -s http://localhost:8001/v1/chat/completions \
-        -H "Content-Type: application/json" \
-        -d "{\"model\": \"$SERVED_MODEL_NAME\", \"messages\": [{\"role\": \"user\", \"content\": \"Write a short paragraph about software architecture.\"}], \"max_tokens\": 128}" \
-        > /dev/null 2>&1
-    echo "Long output warmup $i/2"
-done
-
-echo "=== Warmup complete (8 requests). Server ready for production traffic ==="
-
-# Keep the server running in foreground
+echo "=== Warmup complete. Server ready ==="
 wait $VLLM_PID

@@ -15,19 +15,12 @@ services:
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN:-}
       - HF_HOME=/llm/models/.hf_cache
-      # Intel XPU: Select GPU 1 (avoids conflicts with other containers on GPU 0)
-      - ONEAPI_DEVICE_SELECTOR=level_zero:1
+      # Intel XPU: Use all 4 GPUs for 120B model
+      - ONEAPI_DEVICE_SELECTOR=level_zero:0,1,2,3
       # Intel XPU: Disable torch.compile() - Triton backend incompatible with SYCL
       - TORCH_COMPILE_DISABLE=1
       # Intel XPU: Required for multi-processing on XPU devices
       - VLLM_WORKER_MULTIPROC_METHOD=spawn
-      # Intel proxy configuration
-      - http_proxy=http://proxy-dmz.intel.com:912
-      - https_proxy=http://proxy-dmz.intel.com:912
-      - HTTP_PROXY=http://proxy-dmz.intel.com:912
-      - HTTPS_PROXY=http://proxy-dmz.intel.com:912
-      - no_proxy=localhost,127.0.0.1
-      - NO_PROXY=localhost,127.0.0.1
     volumes:
       - ./models/huggingface:/llm/models
       - ./start-vllm-architect.sh:/llm/start-vllm-architect.sh
@@ -50,9 +43,8 @@ services:
     ports:
       - "9000:9000"
     environment:
-      # Point orchestrator to the host-exposed vLLM. Adjust for Linux host if needed (use host IP or docker gateway).
-      MODEL_NAME: "${MODEL_NAME}"
-      VLLM_URL: "http://host.docker.internal:8000"
+      MODEL_NAME: "${MODEL_NAME:-openai/gpt-oss-120b}"
+      VLLM_URL: "http://localhost:8001"
     restart: on-failure
     networks:
       - lang_net
@@ -60,31 +52,19 @@ services:
   comfyui-flux2:
     image: intel/llm-scaler-omni:0.1.0-b5
     container_name: comfyui_flux2_service
-    # runtime: runc # Default docker runtime
-    privileged: true # Translated from --privileged
-    network_mode: "host" # Translated from --net=host
-    shm_size: "64g" # Translated from --shm-size="64g"
+    privileged: true
+    network_mode: "host"
+    shm_size: "64g"
     devices:
-      - /dev/dri:/dev/dri # Translated from --device=/dev/dri
+      - /dev/dri:/dev/dri
     environment:
       - PYTHONUNBUFFERED=1
-      - http_proxy=http://proxy-dmz.intel.com:912
-      - https_proxy=http://proxy-dmz.intel.com:912
-      - no_proxy=localhost,127.0.0.1
       - COMFYUI_MODEL_DIR=/llm/ComfyUI/models
     volumes:
-      # Persistent model storage as requested
       - ./models/comfyui:/llm/ComfyUI/models
       - ./start_comfyui.sh:/llm/ComfyUI/start_comfyui.sh
-    # Ports are ignored when using network_mode: host
     command: [ "/bin/bash", "/llm/ComfyUI/start_comfyui.sh" ]
     healthcheck:
-      # Verify API is responding (wget is installed in the base image)
-      # The --spider flag is used here to check if the server is up without downloading any files.
-      # In the context of a health check:
-      #   * It behaves like a web crawler (spider): it sends a request to the URL (http://localhost:3000/) to verify connectivity.
-      #   * If the server responds (e.g., with a 200 OK), wget returns a success exit code (0).
-      #   * It discards the content instead of saving an index.html file to the container's disk every 30 seconds, which keeps the container clean.
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/" ]
       interval: 30s
       timeout: 10s
